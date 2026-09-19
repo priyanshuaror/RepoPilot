@@ -43,12 +43,53 @@ ConfigOption = typer.Option(DEFAULT_CONFIG_FILE, "--config", "-c", help="Path to
 OutputOption = typer.Option(None, "--output-dir", "-o", help="Where to write run artifacts")
 
 
+def _validate_issue(issue: str) -> str:
+    """Reject an empty or whitespace-only issue before anything is cloned."""
+    cleaned = (issue or "").strip()
+    if not cleaned:
+        console.print("[bold red]Invalid issue:[/bold red] the issue description cannot be empty.")
+        raise typer.Exit(code=2)
+    if len(cleaned) < 8:
+        console.print(
+            "[bold red]Invalid issue:[/bold red] the description is too short to analyse "
+            f"({len(cleaned)} characters). Describe the problem in a sentence."
+        )
+        raise typer.Exit(code=2)
+    return cleaned
+
+
 def _config(config_path: Path, **overrides: Any) -> RepoPilotConfig:
+    """Load configuration, failing loudly on a config file the user named but that is missing.
+
+    A missing *default* config falls back to built-in defaults; a missing
+    *explicitly requested* one is a user error and must not be silently ignored.
+    """
+    path = Path(config_path)
+    if path != Path(DEFAULT_CONFIG_FILE) and not path.is_file():
+        console.print(f"[bold red]Configuration error:[/bold red] no config file at {path}")
+        raise typer.Exit(code=2)
     try:
-        return load_config(config_path, **overrides)
+        return load_config(path, **overrides)
     except (ValueError, OSError) as exc:
         console.print(f"[bold red]Configuration error:[/bold red] {exc}")
         raise typer.Exit(code=2)
+    except Exception as exc:  # malformed YAML
+        console.print(f"[bold red]Configuration error:[/bold red] could not parse {path}: {exc}")
+        raise typer.Exit(code=2)
+
+
+def _warn_if_no_test_command(repo_analysis) -> None:
+    """Tell the user up front when this repository has no runnable test command.
+
+    RepoPilot is verification-first, so a repository it cannot test is a
+    materially weaker run - the user should know before, not after.
+    """
+    if not repo_analysis.test_commands:
+        console.print(
+            "[bold yellow]Warning:[/bold yellow] no test command could be detected for this "
+            "repository. Verification will fall back to `python -m pytest`, which may not work "
+            "here. Set `repopilot.test_commands` in your config to fix this."
+        )
 
 
 def _run_dir(output_dir: Path | None, run_id: str) -> Path:
@@ -71,6 +112,7 @@ def analyze(
     as_json: bool = typer.Option(False, "--json", help="Print the analysis as JSON instead of prose"),
 ) -> None:
     """Clone and analyse a repository against an issue. Never modifies anything."""
+    issue = _validate_issue(issue)
     settings = _config(config_path, branch=branch)
     run_id = pipeline.new_run_id()
     directory = _run_dir(output_dir, run_id)
@@ -92,6 +134,7 @@ def analyze(
     console.print(f"Languages: {', '.join(repo_analysis.languages) or '(none detected)'}")
     console.print(f"Source files: {len(repo_analysis.source_files)}   Tests: {len(repo_analysis.test_files)}")
     console.print(f"Test commands: {', '.join(repo_analysis.test_commands) or '(none detected)'}")
+    _warn_if_no_test_command(repo_analysis)
     console.print("")
     console.print(bundle.impact.explain())
 
@@ -105,6 +148,7 @@ def plan(
     output_dir: Path | None = OutputOption,
 ) -> None:
     """Produce an implementation plan for an issue, without implementing it."""
+    issue = _validate_issue(issue)
     settings = _config(config_path, branch=branch)
     run_id = pipeline.new_run_id()
     directory = _run_dir(output_dir, run_id)
@@ -116,6 +160,7 @@ def plan(
         raise typer.Exit(code=1)
 
     assert bundle.plan is not None
+    _warn_if_no_test_command(bundle.repository_analysis)
     plan_path = directory / "plan.md"
     plan_path.write_text(bundle.plan.to_markdown(), encoding="utf-8")
     console.print("")
@@ -136,6 +181,10 @@ def run(
     max_fix_attempts: int | None = typer.Option(None, "--max-fix-attempts", help="Cap on bounded repair iterations"),
 ) -> None:
     """Run the full workflow: ingest, analyse, plan, approve, implement, verify, report."""
+    issue = _validate_issue(issue)
+    if dry_run and yes:
+        console.print("[bold red]Invalid arguments:[/bold red] --dry-run and --yes are mutually exclusive.")
+        raise typer.Exit(code=2)
     approval_mode = "dry-run" if dry_run else ("auto" if yes else "interactive")
     settings = _config(
         config_path,

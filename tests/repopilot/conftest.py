@@ -75,3 +75,33 @@ def init_git_repo(path: Path) -> Path:
 def sample_git_repo(sample_repo: Path) -> Path:
     """The sample project, committed to git, ready for diff/verification tests."""
     return init_git_repo(sample_repo)
+
+
+@pytest.fixture
+def git_init():
+    """Expose :func:`init_git_repo` to tests that build their own repositories."""
+    return init_git_repo
+
+
+@pytest.fixture
+def empty_git_repo(tmp_path: Path) -> Path:
+    """A git repository with no files beyond an empty initial commit."""
+    repo = tmp_path / "empty"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-m", "initial commit"], cwd=repo, check=True, capture_output=True
+    )
+    return repo
+
+
+@pytest.fixture
+def repo_without_tests(tmp_path: Path) -> Path:
+    """A Python project that has source files but no tests and no test runner."""
+    repo = tmp_path / "untested"
+    (repo / "src").mkdir(parents=True)
+    (repo / "src" / "auth.py").write_text("def login(user):\n    return bool(user)\n", encoding="utf-8")
+    (repo / "README.md").write_text("# untested\n", encoding="utf-8")
+    return init_git_repo(repo)

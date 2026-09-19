@@ -25,7 +25,7 @@ FAILURE_PATTERNS: tuple[tuple[str, str, str], ...] = (
     ("syntax_error", r"SyntaxError|IndentationError|TabError", "the code does not parse"),
     (
         "import_error",
-        r"ModuleNotFoundError|ImportError|cannot import name",
+        r"ModuleNotFoundError|ImportError|cannot import name|No module named",
         "a module or name could not be imported",
     ),
     (

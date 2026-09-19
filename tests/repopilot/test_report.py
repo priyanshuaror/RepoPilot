@@ -42,7 +42,7 @@ def test_markdown_contains_the_headline_facts():
     assert "18 passed" in markdown
     assert "142 passed" in markdown
     assert "Repair attempts: 1" in markdown
-    assert "Final status: VERIFIED" in markdown
+    assert "final status: VERIFIED" in markdown
     assert "- None" in markdown  # no warnings
 
 
@@ -56,9 +56,9 @@ def test_markdown_handles_a_run_that_never_executed():
     report = RunReport(run_id="r", issue="i", status=STATUS_REJECTED)
     markdown = report.to_markdown()
 
-    assert "not reached" in markdown
-    assert "not run" in markdown
-    assert "- (none)" in markdown
+    assert "_Not reached._" in markdown
+    assert "Targeted: not run" in markdown
+    assert "Broader suite: not run" in markdown
 
 
 def test_report_json_roundtrip():

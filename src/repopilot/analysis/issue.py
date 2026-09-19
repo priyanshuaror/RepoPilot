@@ -33,6 +33,8 @@ STOPWORDS: frozenset[str] = frozenset(
     some
     which while who why will with would you your error errors fail fails failing failure
     fix fixed fixes problem broken expected actual currently instead happens
+    import imports return returns def class self none true false null print
+    python javascript typescript code line lines example examples traceback
     """.split()
 )
 

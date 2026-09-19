@@ -6,6 +6,7 @@ except for one end-to-end case that runs a trivial real command.
 
 import json
 import subprocess
+import sys
 
 from repopilot.testing.verification import TestResult, run_tests, subprocess_runner, verify
 
@@ -102,15 +103,38 @@ def test_verify_runs_all_when_passing(tmp_path):
 
 
 def test_subprocess_runner_runs_in_the_given_directory(tmp_path):
+    """The working directory is the execution boundary, so this must actually hold.
+
+    Uses `python -c` rather than `ls`, which does not exist on Windows.
+    """
     (tmp_path / "marker.txt").write_text("here")
-    exit_code, output = subprocess_runner(
-        'python -c "import os; print(os.listdir())"',
-        tmp_path,
-        30,
-    )
+    command = f'"{sys.executable}" -c "import os; print(os.listdir(\'.\'))"'
+
+    exit_code, output = subprocess_runner(command, tmp_path, 30)
 
     assert exit_code == 0
     assert "marker.txt" in output
+
+
+def test_subprocess_runner_reports_a_nonzero_exit(tmp_path):
+    command = f'"{sys.executable}" -c "raise SystemExit(3)"'
+    exit_code, _ = subprocess_runner(command, tmp_path, 30)
+    assert exit_code == 3
+
+
+def test_subprocess_runner_captures_stderr(tmp_path):
+    command = f'"{sys.executable}" -c "import sys; sys.stderr.write(\'boom\')"'
+    _, output = subprocess_runner(command, tmp_path, 30)
+    assert "boom" in output
+
+
+def test_unavailable_test_command_is_reported_not_raised(tmp_path):
+    """A test command that does not exist must come back as a failed TestResult."""
+    result = run_tests("definitely-not-a-real-command-xyz", tmp_path, timeout=30)
+
+    assert result.success is False
+    assert result.exit_code != 0
+    assert result.parsed is False
 
 
 def test_result_is_json_serializable():

@@ -37,7 +37,13 @@ class SelectedTest:
 
 @dataclass
 class TestSelection:
-    """The targeted test set for a change."""
+    """The targeted test set for a change.
+
+    ``__test__ = False`` for the same reason as :class:`TestResult`: the name
+    starts with ``Test``, so pytest would otherwise try to collect it.
+    """
+
+    __test__ = False
 
     selected_tests: list[SelectedTest] = field(default_factory=list)
     reason: str = ""

@@ -1,0 +1,7 @@
+[project]
+name = "demo-inventory"
+version = "0.1.0"
+description = "Tiny fixture project used by the RepoPilot demo."
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

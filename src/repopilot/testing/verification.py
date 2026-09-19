@@ -31,7 +31,17 @@ MAX_OUTPUT_CHARS = 200_000
 
 @dataclass
 class TestResult:
-    """The outcome of one test command."""
+    """The outcome of one test command.
+
+    ``__test__ = False`` tells pytest not to try to collect this class as a test
+    suite. Without it, importing ``TestResult`` into a test module produces a
+    ``PytestCollectionWarning`` (pytest collects anything named ``Test*``, then
+    complains it has an ``__init__``). It is a marker attribute only - it is not
+    annotated, so it is not a dataclass field, and nothing about the public
+    behaviour of this class changes.
+    """
+
+    __test__ = False
 
     command: str
     exit_code: int
