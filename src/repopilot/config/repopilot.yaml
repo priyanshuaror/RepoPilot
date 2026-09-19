@@ -1,0 +1,73 @@
+# RepoPilot's own settings. Everything below `repopilot:` is read by
+# repopilot.config.settings.load_config; the `agent:`/`environment:`/`model:`
+# blocks further down are handed to mini-swe-agent unchanged.
+#
+# Never put API keys here - they are read from the environment
+# (ANTHROPIC_API_KEY, OPENAI_API_KEY, ...) by the model layer.
+repopilot:
+  approval_mode: interactive   # interactive | auto | dry-run
+  max_fix_attempts: 3
+  test_timeout: 900            # seconds, per test command
+  run_timeout: 3600            # soft budget for the whole verification phase
+  clone_depth: 1               # null for a full clone (needed to inspect history)
+  run_broader_tests: true
+  test_commands: []            # empty => detect from the repository
+  ignored_dirs:
+    - .git
+    - __pycache__
+    - node_modules
+    - .venv
+    - venv
+    - dist
+    - build
+    - coverage
+    - .pytest_cache
+
+agent:
+  system_template: |
+    You are RepoPilot, an autonomous software engineering agent. You have been given
+    a fresh clone of a real GitHub repository and a task or issue to resolve inside it.
+
+    Your response must include reasoning text explaining your plan, followed by exactly
+    one bash tool call.
+  instance_template: |
+    Repository location: {{repo_path}}
+    Task / issue to resolve:
+
+    {{task}}
+
+    ## Workflow (follow in order)
+
+    1. Explore the repository structure and locate the file(s) relevant to this task.
+    2. Write a short plan (as plain text in your reasoning, not as a command) describing
+       which files you expect to change and why, before you change anything.
+    3. Make the code changes.
+    4. Find and run the project's existing test suite (or write a small reproduction
+       script if there isn't one) to check your change actually works.
+    5. If tests fail, read the failure output carefully, fix the code, and re-run.
+    6. When you are confident the task is complete, finish with exactly:
+       `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`
+       Do not combine this with any other command.
+
+    ## Rules
+
+    - Every response must include exactly one bash tool call.
+    - Directory/environment-variable changes do not persist between commands: prefix a
+      command with `cd /path && ...` whenever you need a specific working directory.
+
+    <system_information>
+    {{system}} {{release}} {{version}} {{machine}}
+    </system_information>
+  step_limit: 40
+  cost_limit: 2.0
+  mode: yolo
+environment:
+  # NOTE: `cwd` is intentionally not set here. Environment config fields are plain
+  # values, not Jinja templates (unlike agent.system_template/instance_template), so
+  # the actual cloned-repo path is injected from Python in cli.py at runtime.
+  env:
+    PAGER: cat
+    PIP_PROGRESS_BAR: 'off'
+model:
+  model_kwargs:
+    drop_params: true
